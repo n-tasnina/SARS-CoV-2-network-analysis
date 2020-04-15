@@ -4,6 +4,9 @@ import argparse
 import yaml
 import sys
 import os
+import numpy as np
+import matplotlib.pyplot as plt
+from textwrap import wrap
 from src.setup_datasets import parse_gmt_file
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -113,6 +116,33 @@ def get_list_of_positive_proteins(config_map):
     return list(positive_proteins['prots'])
 
 
+def plot(rank, pvalue, geneset_name, algo_dirpath):
+
+    plt.show()
+    threshold = 0.05
+    pvalue = np.asarray(pvalue)
+    rank = np.asarray(rank)
+    significant = np.ma.masked_where(pvalue <= threshold, pvalue)
+    non_significant = np.ma.masked_where(pvalue > threshold, pvalue)
+
+    fig, ax = plt.subplots()
+    ax.plot(rank, significant, '--o', rank, non_significant,'--o')
+    # plt.plot(rank, pvalue,'--o')
+    plt.xlabel('rank')
+    plt.ylabel('pvalue')
+    plt.title("\n".join(wrap('overlap between ' + geneset_name + ' and proteins predicted by ' + os.path.basename(algo_dirpath))))
+    plt.xticks(np.arange(0, max(rank) + 1, 200))
+
+
+    geneset_name = geneset_name.replace("/", "_")
+    # print(geneset_name)
+    plt.savefig(algo_dirpath +"/Plots/"+geneset_name, format='png')
+
+    # plt.show()
+    # plt.savefig(algo_dirpath + "/" + '52: SARS coronavirus hypothetical protein sars9b from Virus-Host PPI P-HIPSTer 2020', format='png')
+    # plt.savefig( algo_dirpath + "/" + '57: SARS coronavirus nsp7-pp1a/pp1ab (gene: orf1ab) from Virus-Host PPI P-HIPSTer 2020', ormat='png')
+
+
 def main(config_map, **kwargs):
 
     # k = top k predictions to consider to find overlap
@@ -151,6 +181,7 @@ def main(config_map, **kwargs):
                 print(len(predicted_protein_list))
 
                 Fishers_exact_test_output_file = dirpath + '/' + os.path.basename(dirpath)+'_Fishers_exact_test_score.csv'
+                os.mkdir(dirpath + '/Plots')
 
                 oddratio_list = []
                 pvalue_list = []
@@ -169,15 +200,16 @@ def main(config_map, **kwargs):
                         oddratio, pvalue, a, b, c, d = \
                             calc_Fisher_exact_test_score(geneset_uniprotids_dict[gene_set_name], predicted_protein_list, k)
 
-                        oddratio_list.append(oddratio)
-                        pvalue_list.append(pvalue)
+                        reference_prot_set_list.append(gene_set_name)
+                        rank.append(k)
                         a_list.append(a)
                         b_list.append(b)
                         c_list.append(c)
                         d_list.append(d)
+                        oddratio_list.append(oddratio)
+                        pvalue_list.append(pvalue)
 
-                        reference_prot_set_list.append(gene_set_name)
-                        rank.append(k)
+                    plot(rank[-len(k_list):], pvalue_list[-len(k_list):], gene_set_name, dirpath)
 
                 print('writing to' + Fishers_exact_test_output_file)
                 scores = pd.DataFrame({ 'protein_set_name': pd.Series(reference_prot_set_list),
