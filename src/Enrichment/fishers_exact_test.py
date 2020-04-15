@@ -74,7 +74,7 @@ def calc_Fisher_exact_test_score(geneset_protein_list, predicted_protein_list, k
     # returns:
     #       1. oddratio
     #       2. pvalue
-    #       3. number of proteins common to both geneset and predicted list
+    #       3. 4 values from contingency table
 
     total_number_of_protein = len(predicted_protein_list)
 
@@ -83,6 +83,7 @@ def calc_Fisher_exact_test_score(geneset_protein_list, predicted_protein_list, k
         predicted_top_k_proteins = predicted_protein_list[:k]
     else:
         predicted_top_k_proteins = predicted_protein_list
+        k = len(predicted_top_k_proteins)
 
     # NURE: Add a comment explaining why you are doing this.
     reduced_geneset_protein_list = list(set(geneset_protein_list).intersection(set(predicted_protein_list)))
@@ -94,9 +95,16 @@ def calc_Fisher_exact_test_score(geneset_protein_list, predicted_protein_list, k
     c = len(predicted_top_k_proteins) - a
     d = total_number_of_protein - a - b - c
 
-    oddsratio, pvalue = stats.fisher_exact([[a, b], [c, d]])
+    oddsratio, pvalue = stats.fisher_exact([[a, b], [c, d]],'greater')
 
-    return oddsratio, pvalue, number_of_proteins_common_in_reduced_geneset_and_top_k_prediction
+    # fraction_of_predicted_postive_by_random_model = (a+c)/total_number_of_protein
+    # if(a+b>0):
+    #     fraction_of_predicted_postive_by_this_model = a/(a+b)
+    # else:
+    #     fraction_of_predicted_postive_by_this_model = 0
+    #
+    # difference_with_random_prediction = fraction_of_predicted_postive_by_this_model - fraction_of_predicted_postive_by_random_model
+    return oddsratio, pvalue,a, b, c, d
 
 
 def get_list_of_positive_proteins(config_map):
@@ -123,6 +131,9 @@ def main(config_map, **kwargs):
 
     predicted_prot_dir = config_map['predicted_prot_dir']
 
+    # oddratio, pvalue, difference_with_random_prediction, fraction_of_predicted_postive_by_random_model, fraction_of_predicted_postive_by_this_model, a, b, c, d = \
+    #     calc_Fisher_exact_test_score(['Q6UX04','8IWA5','O60885','O00203'], ['Q6UX04','8IWA5','O60885','O00203','P25440','Q86VM9','ABFSS',"JKJ",'ajisiwdhid'],3)
+    # print(difference_with_random_prediction,fraction_of_predicted_postive_by_random_model,fraction_of_predicted_postive_by_this_model,pvalue)
 
     for dirpath, dirs, files in os.walk(predicted_prot_dir):
 
@@ -140,9 +151,14 @@ def main(config_map, **kwargs):
                 print(len(predicted_protein_list))
 
                 Fishers_exact_test_output_file = dirpath + '/' + os.path.basename(dirpath)+'_Fishers_exact_test_score.csv'
+
                 oddratio_list = []
                 pvalue_list = []
-                number_of_common_proteins_list = []
+                a_list=[]
+                b_list=[]
+                c_list=[]
+                d_list=[]
+
                 reference_prot_set_list = []
                 rank = []
 
@@ -150,22 +166,31 @@ def main(config_map, **kwargs):
 
                     for k in k_list:
 
-                        oddratio, pvalue, number_of_common_proteins = \
+                        oddratio, pvalue, a, b, c, d = \
                             calc_Fisher_exact_test_score(geneset_uniprotids_dict[gene_set_name], predicted_protein_list, k)
 
                         oddratio_list.append(oddratio)
                         pvalue_list.append(pvalue)
-                        number_of_common_proteins_list.append(number_of_common_proteins)
+                        a_list.append(a)
+                        b_list.append(b)
+                        c_list.append(c)
+                        d_list.append(d)
+
                         reference_prot_set_list.append(gene_set_name)
                         rank.append(k)
 
-
                 print('writing to' + Fishers_exact_test_output_file)
-                scores = pd.DataFrame({'protein_set_name': pd.Series(reference_prot_set_list),
+                scores = pd.DataFrame({ 'protein_set_name': pd.Series(reference_prot_set_list),
                                         'rank':pd.Series(rank),
-                                        'oddratio': pd.Series(oddratio_list),
+                                        'a': pd.Series(a_list),
+                                        'b': pd.Series(b_list),
+                                        'c': pd.Series(c_list),
+                                        'd': pd.Series(d_list),
+                                        # 'fraction_by_random_predictor': pd.Series(fraction_by_random_predictor_list),
+                                        # 'fraction_by_this_predictor': pd.Series(fraction_by_this_predictor_list),
+                                        # 'difference_with_random_prediction': pd.Series(difference_with_random_prediction_list),
                                         'pvalue': pd.Series(pvalue_list),
-                                        'overlapped_protein': pd.Series(number_of_common_proteins_list)})
+                                        'oddratio': pd.Series(oddratio_list)})
                 scores.to_csv(Fishers_exact_test_output_file, '\t')
 
 
