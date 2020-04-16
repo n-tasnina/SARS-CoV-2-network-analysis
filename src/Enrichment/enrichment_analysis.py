@@ -4,10 +4,8 @@ import argparse
 import yaml
 import sys
 import os
-import numpy as np
-import matplotlib.pyplot as plt
-from textwrap import wrap
 from src.setup_datasets import parse_gmt_file
+import src.Enrichment.plot as pt
 sys.path.insert(0, os.path.dirname(__file__))
 
 
@@ -100,13 +98,6 @@ def calc_Fisher_exact_test_score(geneset_protein_list, predicted_protein_list, k
 
     oddsratio, pvalue = stats.fisher_exact([[a, b], [c, d]],'greater')
 
-    # fraction_of_predicted_postive_by_random_model = (a+c)/total_number_of_protein
-    # if(a+b>0):
-    #     fraction_of_predicted_postive_by_this_model = a/(a+b)
-    # else:
-    #     fraction_of_predicted_postive_by_this_model = 0
-    #
-    # difference_with_random_prediction = fraction_of_predicted_postive_by_this_model - fraction_of_predicted_postive_by_random_model
     return oddsratio, pvalue,a, b, c, d
 
 
@@ -114,33 +105,6 @@ def get_list_of_positive_proteins(config_map):
     # returns: the list of Krogan proteins that have been used as positive examples in prediction
     positive_proteins = pd.read_csv(config_map['positive_protein_file'], '\t')
     return list(positive_proteins['prots'])
-
-
-def plot(rank, pvalue, geneset_name, algo_dirpath):
-
-    plt.show()
-    threshold = 0.05
-    pvalue = np.asarray(pvalue)
-    rank = np.asarray(rank)
-    significant = np.ma.masked_where(pvalue <= threshold, pvalue)
-    non_significant = np.ma.masked_where(pvalue > threshold, pvalue)
-
-    fig, ax = plt.subplots()
-    ax.plot(rank, significant, '--o', rank, non_significant,'--o')
-    # plt.plot(rank, pvalue,'--o')
-    plt.xlabel('rank')
-    plt.ylabel('pvalue')
-    plt.title("\n".join(wrap('overlap between ' + geneset_name + ' and proteins predicted by ' + os.path.basename(algo_dirpath))))
-    plt.xticks(np.arange(0, max(rank) + 1, 200))
-
-
-    geneset_name = geneset_name.replace("/", "_")
-    # print(geneset_name)
-    plt.savefig(algo_dirpath +"/Plots/"+geneset_name, format='png')
-
-    # plt.show()
-    # plt.savefig(algo_dirpath + "/" + '52: SARS coronavirus hypothetical protein sars9b from Virus-Host PPI P-HIPSTer 2020', format='png')
-    # plt.savefig( algo_dirpath + "/" + '57: SARS coronavirus nsp7-pp1a/pp1ab (gene: orf1ab) from Virus-Host PPI P-HIPSTer 2020', ormat='png')
 
 
 def main(config_map, **kwargs):
@@ -161,10 +125,6 @@ def main(config_map, **kwargs):
 
     predicted_prot_dir = config_map['predicted_prot_dir']
 
-    # oddratio, pvalue, difference_with_random_prediction, fraction_of_predicted_postive_by_random_model, fraction_of_predicted_postive_by_this_model, a, b, c, d = \
-    #     calc_Fisher_exact_test_score(['Q6UX04','8IWA5','O60885','O00203'], ['Q6UX04','8IWA5','O60885','O00203','P25440','Q86VM9','ABFSS',"JKJ",'ajisiwdhid'],3)
-    # print(difference_with_random_prediction,fraction_of_predicted_postive_by_random_model,fraction_of_predicted_postive_by_this_model,pvalue)
-
     for dirpath, dirs, files in os.walk(predicted_prot_dir):
 
         for filename in files:
@@ -172,7 +132,6 @@ def main(config_map, **kwargs):
             fname = os.path.join(dirpath, filename)
 
             # this code assume that pred-scores contain score for all the proteins in the network.
-            # have to consider removing this dependency if suggested
             if 'pred-scores' in fname and 'stats' not in fname:
 
                 # filtering out the positive proteins from predicted list of proteins
@@ -181,7 +140,9 @@ def main(config_map, **kwargs):
                 print(len(predicted_protein_list))
 
                 Fishers_exact_test_output_file = dirpath + '/' + os.path.basename(dirpath)+'_Fishers_exact_test_score.csv'
-                os.mkdir(dirpath + '/Plots')
+
+                if(not os.path.exists(dirpath + '/Plots')):
+                    os.mkdir(dirpath + '/Plots')
 
                 oddratio_list = []
                 pvalue_list = []
@@ -209,7 +170,7 @@ def main(config_map, **kwargs):
                         oddratio_list.append(oddratio)
                         pvalue_list.append(pvalue)
 
-                    plot(rank[-len(k_list):], pvalue_list[-len(k_list):], gene_set_name, dirpath)
+                    pt.plot(rank[-len(k_list):], pvalue_list[-len(k_list):], gene_set_name, dirpath)
 
                 print('writing to' + Fishers_exact_test_output_file)
                 scores = pd.DataFrame({ 'protein_set_name': pd.Series(reference_prot_set_list),
@@ -218,9 +179,6 @@ def main(config_map, **kwargs):
                                         'b': pd.Series(b_list),
                                         'c': pd.Series(c_list),
                                         'd': pd.Series(d_list),
-                                        # 'fraction_by_random_predictor': pd.Series(fraction_by_random_predictor_list),
-                                        # 'fraction_by_this_predictor': pd.Series(fraction_by_this_predictor_list),
-                                        # 'difference_with_random_prediction': pd.Series(difference_with_random_prediction_list),
                                         'pvalue': pd.Series(pvalue_list),
                                         'oddratio': pd.Series(oddratio_list)})
                 scores.to_csv(Fishers_exact_test_output_file, '\t')
