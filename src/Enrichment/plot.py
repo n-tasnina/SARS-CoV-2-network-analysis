@@ -4,24 +4,134 @@ from textwrap import wrap
 import pandas as pd
 import sys
 import os
+from src.Enrichment.enrichment_analysis import parse_args, setup_opts
 sys.path.insert(0, os.path.dirname(__file__))
 
-def plot(rank, pvalue, geneset_name, algo_dirpath):
 
-    plt.show()
-    threshold = 0.05
-    pvalue = np.asarray(pvalue)
-    rank = np.asarray(rank)
-    significant = np.ma.masked_where(pvalue <= threshold, pvalue)
-    non_significant = np.ma.masked_where(pvalue > threshold, pvalue)
+def plot_per_network_per_algo_per_geneset(score_dirpath):
+
+
+    for dirpath, dirs, files in os.walk(score_dirpath):
+        # if not os.path.exists(dirpath + '/Plots'):
+        #     os.mkdir(dirpath + '/Plots')
+        # if not os.path.exists(dirpath + '/Plots/pvalue'):
+        #     os.mkdir(dirpath + '/Plots/pvalue')
+        # if not os.path.exists(dirpath + '/Plots/fraction_of_positive_in_top_k_predicton'):
+        #     os.mkdir(dirpath + '/Plots/fraction_of_positive_in_top_k_predicton')
+
+        for filename in files:
+            fname = os.path.join(dirpath, filename)
+            if 'Fishers_exact' in fname:
+                print(fname)
+                df = pd.read_csv(fname,'\t')
+                protein_set_list = df.protein_set_name.unique()
+                for protein_set_name in protein_set_list:
+                    df_ = df.loc[df['protein_set_name'] == protein_set_name]
+                    df_significant = df_.loc[df_['pvalue'] <= 0.05]
+                    df_insignificant = df_.loc[df_['pvalue'] > 0.05]
+                    # plot_pvalue(df_significant, df_insignificant,protein_set_name, dirpath)
+                    plot_fraction(df_significant, df_insignificant, protein_set_name, dirpath)
+                print('done with' + fname)
+
+
+def plot_pvalue(significant, insignificant, protein_set_name, saving_dirpath):
+
+    min_rank = 100
+    max_rank = 2000
+
+    # print(significant['rank'].to_numpy())
 
     fig, ax = plt.subplots()
-    ax.plot(rank, significant, '--o', rank, non_significant,'--o')
+    ax.plot(significant['rank'].to_numpy(),significant['pvalue'].to_numpy(), '--o', insignificant['rank'].to_numpy(), insignificant['pvalue'].to_numpy(), '--o')
+
+    # plt.plot(significant['rank'].to_numpy(),significant['pvalue'].to_numpy(), '--o')
     plt.xlabel('rank')
-    plt.ylabel('pvalue')
-    plt.title("\n".join(wrap('overlap between ' + geneset_name + ' and proteins predicted by ' + os.path.basename(algo_dirpath))))
-    plt.xticks(np.arange(0, max(rank) + 1, 200))
+    plt.ylabel('p-value')
+    plt.title("\n".join(wrap('overlap between ' + protein_set_name + ' and proteins predicted by ' + os.path.basename(saving_dirpath))))
+    plt.xticks(np.arange(0, max_rank+1, 200))
+    protein_set_name = protein_set_name.replace("/", "_")
+    plt.savefig(saving_dirpath + "/Plots/" + 'pvalue/' + protein_set_name, format='png')
+    plt.close()
 
-    geneset_name = geneset_name.replace("/", "_")
-    plt.savefig(algo_dirpath +"/Plots/"+geneset_name, format='png')
+def plot_fraction(significant, insignificant, protein_set_name, saving_dirpath):
 
+    min_rank = 100
+    max_rank = 2000
+
+    # print(significant['rank'].to_numpy())
+
+    fig, ax = plt.subplots()
+    ax.plot(significant['rank'].to_numpy(),significant['fraction_of_positive_in_top_k_predicton'].to_numpy(), '--o',
+            insignificant['rank'].to_numpy(), insignificant['fraction_of_positive_in_top_k_predicton'].to_numpy(), '--o')
+
+    # plt.plot(significant['rank'].to_numpy(),significant['pvalue'].to_numpy(), '--o')
+    plt.xlabel('rank')
+    plt.ylabel('fraction_of_positive_in_top_k_predicton')
+    plt.title("\n".join(wrap('overlap between ' + protein_set_name + ' and proteins predicted by ' + os.path.basename(saving_dirpath))))
+    plt.xticks(np.arange(0, max_rank+1, 200))
+    protein_set_name = protein_set_name.replace("/", "_")
+    plt.savefig(saving_dirpath + "/Plots/" + 'fraction_of_positive_in_top_k_predicton/' + protein_set_name, format='png')
+    plt.close()
+
+def plot_per_network_per_algo_per_k(combined_test_score_directory,combined_test_score_file,k_list):
+
+    df = pd.read_csv(combined_test_score_directory+'/'+combined_test_score_file, '\t')
+    # print(df)
+    network_list = df.network_name.unique()
+    algo_list = df.algorithm.unique()
+    for network_name in network_list:
+        df_net = df.loc[df['network_name'] == network_name]
+        for algo_name in algo_list:
+            df_algo = df_net.loc[df_net['algorithm'] == algo_name]
+            for k in k_list:
+                df_k = df_algo.loc[df_algo['rank'] == k]
+                plt.hist(df_k['pvalue'].to_numpy(),bins = 10)
+                plt.xlabel('p-value')
+                plt.ylabel('# of genesets')
+                plt.title("\n".join(wrap(network_name +' + '+ algo_name+'+ k_'+ str(k))))
+                plt.savefig(combined_test_score_directory+"/Plots/" + network_name +'_' +algo_name +'_' + str(k),format='png')
+                plt.close()
+            print('done with ' + algo_name)
+
+
+def plot_per_network(combined_test_score_directory,combined_test_score_file,k_list):
+    df = pd.read_csv(combined_test_score_directory + '/' + combined_test_score_file, '\t')
+    df_significant = df.loc[df['pvalue']<=0.05]
+    network_list = df_significant.network_name.unique()
+    algo_list = df_significant.algorithm.unique()
+    for network_name in network_list:
+        df_net = df_significant.loc[df['network_name'] == network_name]
+        for algo_name in algo_list:
+            df_algo = df_net.loc[df_net['algorithm'] == algo_name]
+            y_value = []
+            for k in k_list:
+                y_value.append(len(df_algo.loc[df_algo['rank'] == k]))
+            p = plt.plot(k_list,y_value,'--o',label = algo_name)
+
+        plt.xlabel('rank')
+        plt.ylabel('# of genesets having significant p-value')
+        plt.title("\n".join(wrap(network_name)))
+        # for i in range(len(algo_list)):
+        legend = plt.legend(loc='upper left', shadow=False, fontsize='xx-small',borderpad = 0.1)
+        plt.savefig(combined_test_score_directory + "/Plots/" + network_name,
+                    format='png')
+        plt.close()
+
+
+def main(config_map, **kwargs):
+
+    # plot_per_network_per_algo_per_geneset("../../outputs/networks/stringv11/400/2020-03-sarscov2-human-ppi-9606-uniprot-links-full-v11")
+
+    k_list = []
+    if kwargs.get('ks'):
+        ks = kwargs.get('ks')
+        for k in range(ks[0], ks[1] + 1, ks[2]):
+            k_list.append(k)
+
+    # plot_per_network_per_algo_per_k(config_map['combined_test_score_directory'],config_map['combined_test_score_file'], k_list)
+    plot_per_network(config_map['combined_test_score_directory'], config_map['combined_test_score_file'],
+                                    k_list)
+
+if __name__ == "__main__":
+    config_map, kwargs = parse_args()
+    main(config_map,**kwargs)

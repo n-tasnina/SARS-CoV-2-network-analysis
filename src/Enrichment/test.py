@@ -1,6 +1,10 @@
 import matplotlib.pyplot as plt
-import pandas as pd
 import scipy.stats as stats
+import pandas as pd
+import argparse
+import yaml
+import sys
+import os
 
 def nCr(n, r):
     return (fact(n) / (fact(r)
@@ -22,36 +26,49 @@ def find_probability(a,b,c,d):
     print(x)
     return x
 
-def main():
+def setup_opts():
+    # Parse command line args.
+    parser = argparse.ArgumentParser(description="Script for Fisher's exact test")
+    # general parameters
+    group = parser.add_argument_group('Main Options')
+    group.add_argument('--config', type=str, default="config.yaml",
+                       help="Configuration file for this script.")
+    # NURE: allow multiple values to this argument since we want to trace the p-value as we increase k.
+    # We can discuss on Slack. The code to plot the p-values as in my 2011 paper on HIV dependency factors can also be part of this script.
+    # group.add_argument('--k', type=int, help="top k predictions to consider")
 
-    # total = 9000
-    # a_b = 100
-    # c_d = total-a_b
-    #
-    # for a_c in range(100, 500, 100):
-    #     b_d = total - a_c
-    #     for a in range (0,5,1):
-    #         b = a_b - a
-    #         c= a_c - a
-    #         d = b_d - b
-    #         print('for rank = ', a_c, ' and overlap = ', a )
-    #         oddratio, pvalue1 = stats.fisher_exact([[a, b], [c, d]], 'greater')
-    #         print(pvalue1)
-    #
-    #         oddratio, pvalue2 = stats.fisher_exact([[a, b], [c, d]],'less')
-    #         print(pvalue2)
-    #
-    #         prob = find_probability(a,b,c,d)
-    #
-    #         print(pvalue1+pvalue2-prob)
-    a = '57: SARS coronavirus nsp7-pp1a/pp1ab (gene: orf1ab) from Virus-Host PPI P-HIPSTer 2020'
-    a = a.replace('/','_')
-    print(a, type(a))
+    group.add_argument('--ks', type=list, default=[100, 2000, 100], help="value of k will be from list[0] to list[1] increasing by amount of list[2]")
+
+    return parser
 
 
+def parse_args():
+    parser = setup_opts()
+    args = parser.parse_args()
+    kwargs = vars(args)
+    with open(args.config, 'r') as conf:
+        config_map = yaml.load(conf, Loader=yaml.FullLoader)
+    return config_map, kwargs
+
+
+
+def main(config_map, **kwargs):
+
+    predicted_prot_dir = config_map['predicted_prot_dir']
+
+    for dirpath, dirs, files in os.walk(predicted_prot_dir):
+
+        network_name = dirpath.split('/')[3]
+        print(network_name)
+
+        # print(dirpath)
+        for filename in files:
+
+            fname = os.path.join(dirpath, filename)
+            print(fname)
 
 
 
 if __name__ == "__main__":
-    main()
-
+    config_map, kwargs = parse_args()
+    main(config_map, **kwargs)

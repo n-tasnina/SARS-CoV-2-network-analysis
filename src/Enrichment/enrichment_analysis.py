@@ -5,7 +5,6 @@ import yaml
 import sys
 import os
 from src.setup_datasets import parse_gmt_file
-import src.Enrichment.plot as pt
 sys.path.insert(0, os.path.dirname(__file__))
 
 
@@ -106,6 +105,21 @@ def get_list_of_positive_proteins(config_map):
     positive_proteins = pd.read_csv(config_map['positive_protein_file'], '\t')
     return list(positive_proteins['prots'])
 
+def combine_enrichment_scores(predicted_prot_dir):
+
+    df = pd.DataFrame()
+    for dirpath, dirs, files in os.walk(predicted_prot_dir):
+        for filename in files:
+            fname = os.path.join(dirpath, filename)
+
+            if 'Fishers_exact' in fname:
+                # print(fname)
+                df_ = pd.read_csv(fname,'\t')
+                # print(df_)
+                df = df.append(df_)
+
+    df.to_csv(predicted_prot_dir + '/combined_Fishers_exact_test_score.csv','\t', index= False)
+
 
 def main(config_map, **kwargs):
 
@@ -140,9 +154,9 @@ def main(config_map, **kwargs):
                 print(len(predicted_protein_list))
 
                 Fishers_exact_test_output_file = dirpath + '/' + os.path.basename(dirpath)+'_Fishers_exact_test_score.csv'
-
-                if(not os.path.exists(dirpath + '/Plots')):
-                    os.mkdir(dirpath + '/Plots')
+                dirpath_split = dirpath.split('/')
+                algorithm = dirpath_split[-1]
+                network_name = dirpath_split[-4]+'_'+dirpath_split[-3] + '_'+dirpath_split[-2]
 
                 oddratio_list = []
                 pvalue_list = []
@@ -153,6 +167,9 @@ def main(config_map, **kwargs):
 
                 reference_prot_set_list = []
                 rank = []
+                fraction_of_positive_in_top_k_predicton_list = []
+                network_name_list=[]
+                algorithm_list=[]
 
                 for gene_set_name in geneset_uniprotids_dict:
 
@@ -169,20 +186,30 @@ def main(config_map, **kwargs):
                         d_list.append(d)
                         oddratio_list.append(oddratio)
                         pvalue_list.append(pvalue)
+                        fraction_of_positive_in_top_k_predicton_list.append(a/(a+c))
+                        network_name_list.append(network_name)
+                        algorithm_list.append(algorithm)
 
-                    pt.plot(rank[-len(k_list):], pvalue_list[-len(k_list):], gene_set_name, dirpath)
+                    # pt.plot(rank[-len(k_list):], pvalue_list[-len(k_list):], fraction_of_positive_in_top_k_predicton_list[-len(k_list):], gene_set_name, dirpath)
 
                 print('writing to' + Fishers_exact_test_output_file)
-                scores = pd.DataFrame({ 'protein_set_name': pd.Series(reference_prot_set_list),
+                scores = pd.DataFrame({
+                                        'network_name':pd.Series(network_name_list),
+                                        'algorithm': pd.Series(algorithm_list),
+                                        'protein_set_name': pd.Series(reference_prot_set_list),
                                         'rank':pd.Series(rank),
                                         'a': pd.Series(a_list),
                                         'b': pd.Series(b_list),
                                         'c': pd.Series(c_list),
                                         'd': pd.Series(d_list),
                                         'pvalue': pd.Series(pvalue_list),
-                                        'oddratio': pd.Series(oddratio_list)})
-                scores.to_csv(Fishers_exact_test_output_file, '\t')
-
+                                        'oddratio': pd.Series(oddratio_list),
+                                        'fraction_of_positive_in_top_k_predicton': pd.Series(fraction_of_positive_in_top_k_predicton_list)})
+                scores.to_csv(Fishers_exact_test_output_file, '\t', index = False)
+    #
+    # positive_protein_list = get_list_of_positive_proteins(config_map)
+    # predicted_prot_dir = config_map['predicted_prot_dir']
+    combine_enrichment_scores(predicted_prot_dir)
 
 if __name__ == "__main__":
     config_map, kwargs = parse_args()

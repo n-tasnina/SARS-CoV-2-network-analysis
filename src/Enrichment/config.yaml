@@ -2,7 +2,9 @@ reference_gene_set:
     geneset: "../../datasets/genesets/covid19-crowd/genesets.gmt"
     uniprotids: "../../datasets/genesets/covid19-crowd/genesets-uniprotids.gmt"
 
-predicted_prot_dir: "../../outputs/"
+predicted_prot_dir: "../../outputs/networks"
 all_fisher_exact_score_file: "../../outputs/fisher_exact_test_scores.csv"
 network_info_dir: "../../datasets/networks/"
 positive_protein_file: "../../fss_inputs/pos-neg/2020-03-sarscov2-human-ppi/pos.txt"
+combined_test_score_directory: "../../outputs/networks"
+combined_test_score_file: "combined_Fishers_exact_test_score.csv"
