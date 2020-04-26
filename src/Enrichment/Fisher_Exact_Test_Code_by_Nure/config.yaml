@@ -1,0 +1,9 @@
+reference_gene_set:
+    geneset: "../../datasets/genesets/covid19-crowd/genesets.gmt"
+    uniprotids: "../../datasets/genesets/covid19-crowd/genesets-uniprotids.gmt"
+
+predicted_prot_dir: "../../outputs_16042020/networks"
+network_info_dir: "../../datasets/networks/"
+positive_protein_file: "../../fss_inputs/pos-neg/2020-03-sarscov2-human-ppi/pos.txt"
+combined_test_score_directory: "../../outputs_16042020/networks"
+combined_test_score_file: "combined_Fishers_test_score.csv"
